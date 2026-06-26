@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule }              from '@angular/common';
 import { RouterModule }              from '@angular/router';
 import { DashboardService }          from '../../core/services/services';
@@ -13,7 +13,6 @@ import { DashboardDto }              from '../../core/models/models';
       <h1 class="page-title">Dashboard de Producción</h1>
 
       <ng-container *ngIf="!loading; else spinner">
-        <!-- Distribución global por estación -->
         <section class="section">
           <h2 class="section-title">Distribución global de ventanas</h2>
           <div class="estaciones-grid">
@@ -26,7 +25,6 @@ import { DashboardDto }              from '../../core/models/models';
           </div>
         </section>
 
-        <!-- Órdenes activas -->
         <section class="section">
           <div class="section-header">
             <h2 class="section-title">Órdenes activas</h2>
@@ -69,7 +67,6 @@ import { DashboardDto }              from '../../core/models/models';
     .section     { margin-bottom: 36px; }
     .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
     .section-title  { font-size: 16px; font-weight: 600; color: #2d3748; margin-bottom: 16px; }
-
     .estaciones-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
     .estacion-card   { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 10px;
                        padding: 20px 16px; text-align: center; }
@@ -77,7 +74,6 @@ import { DashboardDto }              from '../../core/models/models';
     .est-nombre { display: block; font-size: 13px; color: #4a5568; margin: 4px 0; }
     .est-count  { display: block; font-size: 22px; font-weight: 600; color: #1a365d; }
     .est-pct    { display: block; font-size: 12px; color: #718096; }
-
     .orden-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
                   padding: 20px; margin-bottom: 12px; }
     .orden-info { margin-bottom: 12px; }
@@ -89,8 +85,6 @@ import { DashboardDto }              from '../../core/models/models';
     .progreso-pct  { font-size: 13px; font-weight: 600; color: #38a169; min-width: 44px; }
     .orden-meta    { display: flex; justify-content: space-between; font-size: 13px; color: #718096; }
     .link-detalle  { color: #2b6cb0; text-decoration: none; font-weight: 500; }
-    .link-detalle:hover { text-decoration: underline; }
-
     .btn-new { background: #2b6cb0; color: #fff; padding: 8px 16px; border-radius: 8px;
                text-decoration: none; font-size: 13px; font-weight: 600; }
     .loading { text-align: center; padding: 60px; color: #718096; }
@@ -100,6 +94,7 @@ import { DashboardDto }              from '../../core/models/models';
 })
 export class DashboardComponent implements OnInit {
   private svc = inject(DashboardService);
+  private cdr = inject(ChangeDetectorRef);
 
   data?: DashboardDto;
   loading  = true;
@@ -107,8 +102,16 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.svc.obtenerResumen().subscribe({
-      next:  data => { this.data = data; this.loading = false; },
-      error: ()   => { this.errorMsg = 'Error al cargar el dashboard.'; this.loading = false; }
+      next: data => {
+        this.data = data;
+        this.loading = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.errorMsg = 'Error al cargar el dashboard.';
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 }

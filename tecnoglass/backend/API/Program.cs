@@ -9,30 +9,26 @@ using Tecnoglass.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Configuración ────────────────────────────────────────────
-var jwtSettings  = builder.Configuration.GetSection("Jwt");
-var jwtSecret    = jwtSettings["Secret"]   ?? throw new InvalidOperationException("JWT Secret no configurado.");
-var jwtIssuer    = jwtSettings["Issuer"]   ?? "tecnoglass";
-var jwtAudience  = jwtSettings["Audience"] ?? "tecnoglass-app";
-var connString   = builder.Configuration.GetConnectionString("Default")
-                   ?? throw new InvalidOperationException("Connection string 'Default' no configurada.");
+var jwtSettings = builder.Configuration.GetSection("Jwt");
+var jwtSecret   = jwtSettings["Secret"]   ?? throw new InvalidOperationException("JWT Secret no configurado.");
+var jwtIssuer   = jwtSettings["Issuer"]   ?? "tecnoglass";
+var jwtAudience = jwtSettings["Audience"] ?? "tecnoglass-app";
+var connString  = builder.Configuration.GetConnectionString("Default")
+                  ?? throw new InvalidOperationException("Connection string 'Default' no configurada.");
 
-// ── Infraestructura ──────────────────────────────────────────
 builder.Services.AddSingleton(new DbContext(connString));
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<OrdenProduccionRepository>();
 builder.Services.AddScoped<VentanaRepository>();
 builder.Services.AddScoped<DashboardRepository>();
 
-// ── Servicios de aplicación ──────────────────────────────────
 builder.Services.AddSingleton<ITokenService>(
     _ => new TokenService(jwtSecret, jwtIssuer, jwtAudience));
-builder.Services.AddScoped<IAuthService,           AuthService>();
+builder.Services.AddScoped<IAuthService,            AuthService>();
 builder.Services.AddScoped<IOrdenProduccionService, OrdenProduccionService>();
 builder.Services.AddScoped<IVentanaService,         VentanaService>();
 builder.Services.AddScoped<IDashboardService,       DashboardService>();
 
-// ── JWT Authentication ───────────────────────────────────────
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -52,38 +48,25 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
-// ── CORS (para Angular en dev) ───────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Angular", policy =>
-        policy.WithOrigins("http://localhost:4200")
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
 
-// ── Controllers + Swagger ────────────────────────────────────
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title   = "Tecnoglass API",
-        Version = "v1",
-        Description = "API de producción de ventanería — Tecnoglass / Energía Solar S.A."
-    });
-
-    // Soporte JWT en Swagger UI
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Tecnoglass API", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Name         = "Authorization",
-        Type         = SecuritySchemeType.Http,
-        Scheme       = "bearer",
-        BearerFormat = "JWT",
-        In           = ParameterLocation.Header,
-        Description  = "Ingrese el token JWT. Ejemplo: Bearer {token}"
+        Name = "Authorization", Type = SecuritySchemeType.Http,
+        Scheme = "bearer", BearerFormat = "JWT", In = ParameterLocation.Header,
+        Description = "Ingrese: Bearer {token}"
     });
-
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -96,18 +79,21 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// ── Build ────────────────────────────────────────────────────
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.Use(async (ctx, next) =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Tecnoglass API v1"));
-}
+    ctx.Response.Headers["Access-Control-Allow-Origin"]  = "*";
+    ctx.Response.Headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS";
+    ctx.Response.Headers["Access-Control-Allow-Headers"] = "Authorization,Content-Type";
+    if (ctx.Request.Method == "OPTIONS") { ctx.Response.StatusCode = 200; return; }
+    await next();
+});
 
 app.UseCors("Angular");
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Tecnoglass API v1"));
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
 app.Run();
